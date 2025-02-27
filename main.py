@@ -1,7 +1,7 @@
 import os
 import logging
 from telethon import TelegramClient, events
-from telethon.tl.types import ChannelParticipantsKicked, DocumentAttributeFilename, ChannelParticipantAdmin, ChannelParticipantCreator
+from telethon.tl.types import ChannelParticipantsKicked, DocumentAttributeFilename
 from telethon.errors import FloodWaitError, RPCError
 import io
 
@@ -27,7 +27,7 @@ def split_message(text, max_length=4096):
     return [text[i:i + max_length] for i in range(0, len(text), max_length)]
 
 # Genera un archivo de texto con la lista de usuarios expulsados 📄
-def generate_ban_file(banned_users):
+def generate_ban_file(banned_users, chat_title):
     """Crea un archivo de texto en memoria con la lista de usuarios expulsados."""
     buffer = io.StringIO()
     buffer.write("ID,Username\n")  # Encabezado simple tipo CSV
@@ -35,9 +35,11 @@ def generate_ban_file(banned_users):
         username = f"@{user.username}" if user.username else "N/A"
         buffer.write(f"{user.id},{username}\n")
     buffer.seek(0)
-    return io.BytesIO(buffer.getvalue().encode('utf-8')), f"banned_users_{len(banned_users)}.txt"
+    # Nombre del archivo con el título del grupo
+    file_name = f"{chat_title}_usuarios_{len(banned_users)}.txt"
+    return io.BytesIO(buffer.getvalue().encode('utf-8')), file_name
 
-# Comando /listabn (solo para administradores) 🚫
+# Comando /listabn (disponible para todos) 🚫
 @client.on(events.NewMessage(pattern=r'^/listabn\s*', incoming=True))
 async def listabn_handler(event):
     chat = await event.get_chat()
@@ -46,29 +48,20 @@ async def listabn_handler(event):
 
     logger.debug(f"Comando /listabn recibido en chat {chat_id} por {sender.id}: {event.message.text}")
 
-    # Verifica si el usuario es administrador o creador 🔍
-    try:
-        participant = await client.get_participant(chat, sender.id)
-        is_admin = isinstance(participant, (ChannelParticipantAdmin, ChannelParticipantCreator))
-    except Exception as e:
-        logger.warning(f"No se pudo verificar permisos de {sender.id} en chat {chat_id}: {str(e)}")
-        is_admin = False
-
-    # Respuesta para no administradores 🚷
-    if not is_admin:
-        await event.reply("⛔ ¡Solo los administradores pueden usar este comando! Contacta a un administrador si necesitas ayuda.")
-        logger.warning(f"Usuario no administrador {sender.id} intentó usar /listabn en {chat_id}")
-        return
-
     # Verifica permisos del bot 🔧
     if not hasattr(chat, 'admin_rights') or not chat.admin_rights or not chat.admin_rights.ban_users:
         await event.reply("⚠️ Necesito permisos de administrador para listar usuarios expulsados.")
         logger.warning(f"Intento de /listabn sin permisos de bot en {chat_id}")
         return
 
+    # Obtiene el nombre del grupo
+    chat_title = chat.title if hasattr(chat, 'title') else f"Chat_{chat_id}"
+    # Sanitiza el título para evitar caracteres inválidos en nombres de archivo
+    chat_title = "".join(c for c in chat_title if c.isalnum() or c in (' ', '_')).strip().replace(' ', '_')
+
     # Notifica que el comando está en ejecución ⏳
     status_msg = await event.reply("⏳ Procesando la lista de usuarios expulsados... Esto puede tomar un momento.")
-    logger.info(f"Inicio de /listabn en chat {chat_id} por administrador {sender.id}")
+    logger.info(f"Inicio de /listabn en chat {chat_id} por usuario {sender.id}")
 
     try:
         # Obtiene usuarios expulsados 👥
@@ -99,7 +92,7 @@ async def listabn_handler(event):
                 await event.reply(msg)
 
         # Genera y envía el archivo descargable 📤
-        file_content, file_name = generate_ban_file(banned_users)
+        file_content, file_name = generate_ban_file(banned_users, chat_title)
         await client.send_file(
             chat_id,
             file=file_content,
