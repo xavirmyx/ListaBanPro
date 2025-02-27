@@ -37,23 +37,23 @@ def generate_ban_file(banned_users):
     buffer.seek(0)
     return io.BytesIO(buffer.getvalue().encode('utf-8')), f"banned_users_{len(banned_users)}.txt"
 
-# Comando /banlist (con depuración mejorada)
-@client.on(events.NewMessage(pattern=r'^/banlist\s*', incoming=True))  # Ajustamos el patrón para permitir espacios
-async def banlist_handler(event):
+# Comando /listabn (cambiado desde /banlist, con depuración mejorada)
+@client.on(events.NewMessage(pattern=r'^/listabn\s*', incoming=True))  # Ajustamos el patrón para permitir espacios
+async def listabn_handler(event):
     chat = await event.get_chat()
     chat_id = event.chat_id
 
-    logger.debug(f"Recibido comando /banlist en chat {chat_id}: {event.message.text}")
+    logger.debug(f"Recibido comando /listabn en chat {chat_id}: {event.message.text}")
 
     # Verifica permisos de administrador
     if not hasattr(chat, 'admin_rights') or not chat.admin_rights or not chat.admin_rights.ban_users:
         await event.reply("Necesito permisos de administrador para listar usuarios expulsados.")
-        logger.warning(f"Intento de /banlist sin permisos en chat {chat_id}")
+        logger.warning(f"Intento de /listabn sin permisos en chat {chat_id}")
         return
 
     # Notifica que el comando está en ejecución
     status_msg = await event.reply("Procesando la lista de usuarios expulsados... Esto puede tomar un momento.")
-    logger.info(f"Inicio de /banlist en chat {chat_id}")
+    logger.info(f"Inicio de /listabn en chat {chat_id}")
 
     try:
         # Obtiene usuarios expulsados
@@ -65,7 +65,7 @@ async def banlist_handler(event):
 
         if not banned_users:
             await status_msg.edit("No hay usuarios expulsados en este chat.")
-            logger.info(f"Finalizado /banlist en chat {chat_id}: No hay usuarios expulsados.")
+            logger.info(f"Finalizado /listabn en chat {chat_id}: No hay usuarios expulsados.")
             return
 
         # Construye la lista para mostrar en el chat
@@ -92,7 +92,7 @@ async def banlist_handler(event):
             file_name=file_name,
             attributes=[DocumentAttributeFilename(file_name)]  # Añadimos el atributo de nombre de archivo
         )
-        logger.info(f"Finalizado /banlist en chat {chat_id}: {total_banned} usuarios listados y archivo enviado.")
+        logger.info(f"Finalizado /listabn en chat {chat_id}: {total_banned} usuarios listados y archivo enviado.")
 
     except FloodWaitError as e:
         await status_msg.edit(f"Demasiadas solicitudes. Espera {e.seconds} segundos.")
