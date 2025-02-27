@@ -76,31 +76,17 @@ async def listabn_handler(event):
             logger.info(f"Finalizado /listabn en {chat_id}: No hay usuarios expulsados.")
             return
 
-        # Construye la lista para mostrar en el chat (sin el encabezado "Usuarios expulsados")
-        ban_list = [f"@{user.username}" if user.username else f"ID: {user.id}" for user in banned_users]
-        total_banned = len(ban_list)
-        ban_text = "\n".join(ban_list[:10])  # Limita a 10
-        if total_banned > 10:
-            ban_text += f"\n... y {total_banned - 10} más. Descarga el archivo para la lista completa."
-
-        # Divide el mensaje si es muy largo 📏
-        messages = split_message(ban_text)
-        for i, msg in enumerate(messages):
-            if i == 0:
-                await status_msg.edit(msg)
-            else:
-                await event.reply(msg)
-
         # Genera y envía el archivo descargable 📤
         file_content, file_name = generate_ban_file(banned_users, chat_title)
         await client.send_file(
             chat_id,
             file=file_content,
-            caption=f"📋 Lista completa de {total_banned} usuarios expulsados.",
+            caption=f"📋 Lista completa de {len(banned_users)} usuarios expulsados.",
             file_name=file_name,
             attributes=[DocumentAttributeFilename(file_name)]
         )
-        logger.info(f"Finalizado /listabn en {chat_id}: {total_banned} usuarios listados y archivo enviado.")
+        await status_msg.delete()  # Elimina el mensaje de "Procesando..."
+        logger.info(f"Finalizado /listabn en {chat_id}: {len(banned_users)} usuarios listados y archivo enviado.")
 
     except FloodWaitError as e:
         await status_msg.edit(f"⏱️ Demasiadas solicitudes. Espera {e.seconds} segundos.")
