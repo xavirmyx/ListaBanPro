@@ -76,10 +76,10 @@ async def listabn_handler(event):
             logger.info(f"Finalizado /listabn en {chat_id}: No hay usuarios expulsados.")
             return
 
-        # Construye la lista para mostrar en el chat 📜
+        # Construye la lista para mostrar en el chat (sin el encabezado "Usuarios expulsados")
         ban_list = [f"@{user.username}" if user.username else f"ID: {user.id}" for user in banned_users]
         total_banned = len(ban_list)
-        ban_text = f"🚫 Usuarios expulsados ({total_banned}):\n" + "\n".join(ban_list[:10])  # Limita a 10
+        ban_text = "\n".join(ban_list[:10])  # Limita a 10
         if total_banned > 10:
             ban_text += f"\n... y {total_banned - 10} más. Descarga el archivo para la lista completa."
 
