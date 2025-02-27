@@ -1,7 +1,7 @@
 import os
 import logging
 from telethon import TelegramClient, events
-from telethon.tl.types import ChannelParticipantsKicked, DocumentAttributeFilename
+from telethon.tl.types import ChannelParticipantsKicked, DocumentAttributeFilename, ChannelParticipantAdmin, ChannelParticipantCreator
 from telethon.errors import FloodWaitError, RPCError
 import io
 
@@ -37,23 +37,38 @@ def generate_ban_file(banned_users):
     buffer.seek(0)
     return io.BytesIO(buffer.getvalue().encode('utf-8')), f"banned_users_{len(banned_users)}.txt"
 
-# Comando /listabn (cambiado desde /banlist, con depuración mejorada)
+# Comando /listabn (solo para administradores, con mensaje para no administradores)
 @client.on(events.NewMessage(pattern=r'^/listabn\s*', incoming=True))  # Ajustamos el patrón para permitir espacios
 async def listabn_handler(event):
     chat = await event.get_chat()
     chat_id = event.chat_id
+    sender = await event.get_sender()
 
-    logger.debug(f"Recibido comando /listabn en chat {chat_id}: {event.message.text}")
+    logger.debug(f"Recibido comando /listabn en chat {chat_id} de {sender.id}: {event.message.text}")
 
-    # Verifica permisos de administrador
+    # Verifica si el usuario es administrador o creador
+    try:
+        participant = await client.get_participant(chat, sender.id)
+        is_admin = isinstance(participant, (ChannelParticipantAdmin, ChannelParticipantCreator))
+    except Exception as e:
+        logger.warning(f"No se pudo verificar los permisos del usuario {sender.id} en chat {chat_id}: {str(e)}")
+        is_admin = False
+
+    # Si el usuario no es administrador, envía un mensaje al grupo
+    if not is_admin:
+        await event.reply("¡Solo los administradores pueden usar este comando! Contacta a un administrador si necesitas asistencia.")
+        logger.warning(f"Usuario no administrador {sender.id} intentó usar /listabn en chat {chat_id}")
+        return
+
+    # Verifica permisos del bot (asegurarse de que el bot tiene permisos de administrador)
     if not hasattr(chat, 'admin_rights') or not chat.admin_rights or not chat.admin_rights.ban_users:
         await event.reply("Necesito permisos de administrador para listar usuarios expulsados.")
-        logger.warning(f"Intento de /listabn sin permisos en chat {chat_id}")
+        logger.warning(f"Intento de /listabn sin permisos de bot en chat {chat_id}")
         return
 
     # Notifica que el comando está en ejecución
     status_msg = await event.reply("Procesando la lista de usuarios expulsados... Esto puede tomar un momento.")
-    logger.info(f"Inicio de /listabn en chat {chat_id}")
+    logger.info(f"Inicio de /listabn en chat {chat_id} por administrador {sender.id}")
 
     try:
         # Obtiene usuarios expulsados
